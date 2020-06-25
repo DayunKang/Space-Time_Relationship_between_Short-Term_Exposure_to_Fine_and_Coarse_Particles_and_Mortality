@@ -1,6 +1,7 @@
 Space–Time Relationship between Short-Term Exposure to Fine and Coarse Particles and Mortality in a Nationwide Analysis of Korea: A Bayesian Hierarchical Spatio-Temporal Model
 
 Abstract
+
 Previous studies have shown an association between mortality and ambient air pollution
 in South Korea. However, these studies may have been subject to bias, as they lacked adjustment
 for spatio-temporal structures. This paper addresses this research gap by examining the association
