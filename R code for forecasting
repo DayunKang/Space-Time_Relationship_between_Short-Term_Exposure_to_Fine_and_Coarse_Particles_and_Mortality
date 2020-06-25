@@ -1,0 +1,87 @@
+# R code for forecasting
+
+library(coda)
+setwd("D:/")
+coda <- list()
+coda[[1]]=read.coda(output.file="total_pm10 coda 1.txt",  # import coda file
+                    index.file="total_pm10 coda index.txt")
+coda[[2]]=read.coda(output.file="total_pm10 coda 2.txt", 
+                    index.file="total_pm10 coda index.txt")
+coda.f <- rbind(coda[[1]], coda[[2]])
+
+psi.new <- c()
+y.new  <- rep(list(matrix(0, nrow=250, ncol=5000)),12) # for forecasted values
+mu  <- rep(list(matrix(0, nrow=250, ncol=5000)),12) 
+T <- Sys.time() # to check the computing time (just in case)
+for (k in 1:12) { 
+for (i in 1:250) {
+  for (j in 1:5000) {
+      PM <- no2[i,(36+k)]
+      t <- temp[i,(36+k)]
+      h <- hum[i,(36+k)]
+      w <- wind[i,(36+k)]
+      dep <- depri[i]
+      oldpop <- pop[i,4]
+      beta0 <- coda.f[j,4]
+      beta1 <- coda.f[j,(i+4)]
+      alpha1 <- coda.f[j,1]
+      alpha2 <- coda.f[j,2]
+      alpha3 <- coda.f[j,3]
+      gamma <- coda.f[j,291]
+      u <- coda.f[j,(i+9333)]
+      v <- coda.f[j,(i+9583)]
+      psi <- coda.f[j,9327]
+      rho <- coda.f[j,9328]
+      sigma.d <- coda.f[j,9329]
+      sigma.psi <- coda.f[j,9331]
+      sigma.phi <- coda.f[j,9330]
+      e <- rnorm(12,0,sqrt((sigma.psi)^2*(1-rho^2)))
+      if (k==1) {psi.new[k] <- rho*psi + e[k]}
+      else {psi.new[k] <- rho*psi.new[(k-1)] + e[k]}
+      d.new <- rnorm(1,0,sigma.d)
+      phi.new <- rnorm(1,0,sigma.phi)
+      log.mu <- beta0 + beta1*PM + alpha1*t + alpha2*h + alpha3*w +gamma*dep + log(oldpop) +u+v+psi.new[k]+d.new+phi.new
+      mu[[k]][i,j] <- exp(log.mu)
+      y.new[[k]][i,j] <- rpois(1,mu[[k]][i,j]) # sampling for forecasting
+    }
+  }}
+Sys.time()-T # to check the computing time (just in case)
+
+
+####################
+# result (summary) #
+####################
+setwd("D:/")
+
+result  <- rep(list(data.frame(y=rep(NA,250), mean=rep(NA,250), CI_L=rep(NA,250), med=rep(NA,250), CI_U=rep(NA,250))), 12)
+mspe <- rep(NA, 12)
+
+for (k in 1:12){
+  result[[k]][,"y"] <- total[,(36+k)]
+
+  for (i in 1:250){
+  result[[k]][i,"mean"] <- mean(y.new[[k]][i,])
+  result[[k]][i,"CI_L"] <- quantile(y.new[[k]][i,], probs=0.025)
+  result[[k]][i,"med"] <- quantile(y.new[[k]][i,], probs=0.5)
+  result[[k]][i,"CI_U"] <- quantile(y.new[[k]][i,], probs=0.975)
+  mspe[k] <- mean((total[,(36+k)]-result[[k]][,"mean"])^2)
+  }
+}
+
+result.st <- rep(list(matrix(0, nrow=250, ncol=4)),12)
+for (k in 1:12) {
+  result.st[[k]] <- result[[k]][order(result[[k]][,"y"]),]
+  write.csv(result.st[[k]], file=sprintf("ypred%d.csv",k))
+}
+
+for (k in 1:12) { # forecasting plots (Figure 4 in the paper)
+  png(width = 6000, height = 6000, filename=sprintf("%d.png",k) , type = "cairo", antialias = "subpixel", family = "malgun", res = 500)
+  plot(result.st[[k]][,"y"], result.st[[k]][,"mean"], xlim=c(0,250), ylim=c(0,250),  xlab=paste("Observed number of deaths for", sprintf("2015/%d",k)), 
+       ylab=paste("Predicted number of deaths for", sprintf("2015/%d",k)), main="PM10", pch=19, cex=0.8)
+  lines(0:250,0:250, col="red")
+  pallete = topo.colors(1, alpha=0.1)
+  polygon(c(rev(result.st[[k]][,"y"]),result.st[[k]][,"y"]), c(rev(result.st[[k]][,"CI_U"]), result.st[[k]][,"CI_L"]), border = F,
+          col=pallete)
+  text(80,40,paste("MSPE=",round(mspe[k],2)))
+  dev.off()
+}
