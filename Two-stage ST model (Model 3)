@@ -1,0 +1,91 @@
+# First part for two-stage model 
+
+model{
+
+for(i in 1:N.site) {
+  for(t in 1:N.time) {
+    y[i,t]~dpois(mu[i,t])
+    y.pred[i,t]~dpois(mu[i,t])
+    log(mu[i,t])<-beta0+beta1*PM[i,t]+alpha[1]*Temp[i,t]+alpha[2]*Hum[i,t]+alpha[3]*Wind[i,t]+gamma*Dep[i]+log(oldpop[i,s[t]])
+}}
+
+beta1 ~ dnorm(0,1.0E-6)
+beta0 ~ dnorm(0,1.0E-6)
+
+# priors
+for(i in 1:3) {
+  alpha[i]~ dnorm(0,1.0E-6)
+}
+gamma ~ dnorm(0,1.0E-6)
+}
+
+
+# Second part for two-stage model 
+
+model{
+
+for(i in 1:N.site) {
+  for(t in 1:N.time) {
+    r[i,t] <- log(y[i,t])-log(mu[i,t])
+    r[i,t] ~ dnorm(mu2[i,t], tau.r)
+    mu2[i,t] <- u[i]+v[i]+psi[t]+d[t]+phi[i,t]
+    phi[i,t] ~ dnorm(0, tau.phi)
+}}
+
+
+# Spatial and temporal priors
+u[1:N.site] ~ car.normal(adj[],weights[],num[],tau.u)
+for(k in 1:sumNumNeigh){
+    weights[k] <-1}
+
+for(i in 1:N.site) {
+v[i]~dnorm(0,tau.v)
+}
+
+for(t in 1:N.time) {
+d[t]~dnorm(0,tau.d)
+}
+
+mu.psi[1]<-0
+psi[1] ~ dnorm(mu.psi[1],tau.psi)
+for( t in 2:N.time){
+mu.psi[t]<-psi[t-1] *rho
+psi[t] ~ dnorm(mu.psi[t] , tau.psi) }
+rho ~ dbeta(1,1)
+
+tau.u<-1/pow(sigma.u,2)
+sigma.u ~ dunif(0,100)
+tau.v<-1/pow(sigma.v,2)
+sigma.v ~ dunif(0,100)
+tau.psi <- 1/pow(sigma.psi,2)
+sigma.psi~ dunif(0,100)
+tau.d<-1/pow(sigma.d,2)
+sigma.d ~ dunif(0,100)
+tau.phi<-1/pow(sigma.phi,2)
+sigma.phi ~ dunif(0,100)
+
+tau.r <- 1/pow(sigma.r,2)
+sigma.r ~ dunif(0,100)
+}
+
+
+# Third part for two-stage model 
+
+model{
+
+for(i in 1:N.site) {
+  for(t in 1:N.time) {
+    y[i,t]~dpois(mu[i,t])
+    y.pred[i,t]~dpois(mu[i,t])
+    log(mu[i,t])<-beta0+beta1*PM[i,t]+alpha[1]*Temp[i,t]+alpha[2]*Hum[i,t]+alpha[3]*Wind[i,t]+gamma*Dep[i]+log(oldpop[i,s[t]])+mu2[i,t]
+}}
+
+beta1 ~ dnorm(0,1.0E-6)
+beta0 ~ dnorm(0,1.0E-6)
+
+# priors
+for(i in 1:3) {
+  alpha[i]~ dnorm(0,1.0E-6)
+}
+gamma ~ dnorm(0,1.0E-6)
+}
